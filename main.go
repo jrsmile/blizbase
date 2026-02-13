@@ -5,14 +5,24 @@ import (
     "os"
     "net/http"
 	"time"
+    "context"
 
 	"golang.org/x/time/rate"
+    "github.com/joho/godotenv"
     "github.com/pocketbase/pocketbase"
     "github.com/pocketbase/pocketbase/apis"
     "github.com/pocketbase/pocketbase/core"
     "github.com/FuzzyStatic/blizzard/v3"
 
 )
+
+func goDotEnvVariable(key string) string {
+  err := godotenv.Load(".env")
+  if err != nil {
+    log.Fatalf("Error loading .env file")
+  }
+  return os.Getenv(key)
+}
 
 type ThrottledTransport struct {
 	roundTripperWrap http.RoundTripper
@@ -34,18 +44,33 @@ func NewThrottledTransport(limitPeriod time.Duration, requestCount int, transpor
 	}
 }
 func blizzClientExample() {
-    client := http.DefaultClient
-    client.Transport = NewThrottledTransport(10*time.Second, 60, http.DefaultTransport) // allows 60 requests every 10 seconds
+    ctx := context.Background()
+    throttledClient := http.DefaultClient
+    throttledClient.Transport = NewThrottledTransport(time.Second, 10, http.DefaultTransport) // allows 10 requests every second //36000 per Hour
     euBlizzClient, err := blizzard.NewClient(blizzard.Config{
-    ClientID:     "my_client_id",
-    ClientSecret: "my_client_secret",
-    HTTPClient:   client,
+    ClientID:     goDotEnvVariable("CLIENT_ID"),
+    ClientSecret: goDotEnvVariable("CLIENT_SECRET"),
+    HTTPClient:   throttledClient,
     Region:       blizzard.EU,
     Locale:       blizzard.DeDE,
     })
-    _ = euBlizzClient
+    err = euBlizzClient.AccessTokenRequest(ctx)
     if err != nil {
-        log.Fatal(err)
+    log.Println(err)
+    }
+    roster , header, err:= euBlizzClient.WoWGuildRoster(ctx, goDotEnvVariable("REALM_SLUG"),goDotEnvVariable("GUILD_SLUG"))
+    if err != nil {
+        log.Println(header)
+        log.Println(err)
+    }
+    //log.Println("Response Header:", header)
+    for _, member := range roster.Members {
+        memberInfo, header, err := euBlizzClient.WoWCharacterProfileSummary(ctx, member.Character.Realm.Slug, member.Character.Name)
+        if err != nil {
+            log.Println("Response Header:", header)
+            log.Println(err)
+        }
+        log.Printf("Member: %s, Level: %d, Points: %d\n", memberInfo.Name, memberInfo.Level, memberInfo.AchievementPoints)
     }
 }
 
