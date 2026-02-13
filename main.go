@@ -13,14 +13,14 @@ import (
 )
 
 func main() {
-    usBlizzClient, err := blizzard.NewClient(blizzard.Config{
+    euBlizzClient, err := blizzard.NewClient(blizzard.Config{
     ClientID:     "my_client_id",
     ClientSecret: "my_client_secret",
     HTTPClient:   http.DefaultClient,
     Region:       blizzard.EU,
     Locale:       blizzard.DeDE,
     })
-    _ = usBlizzClient
+    _ = euBlizzClient
     if err != nil {
         log.Fatal(err)
     }
