@@ -46,7 +46,7 @@ func NewThrottledTransport(limitPeriod time.Duration, requestCount int, transpor
 func blizzClientExample() {
     ctx := context.Background()
     throttledClient := http.DefaultClient
-    throttledClient.Transport = NewThrottledTransport(time.Second, 10, http.DefaultTransport) // allows 10 requests every second //36000 per Hour
+    throttledClient.Transport = NewThrottledTransport(time.Second/10, 10, http.DefaultTransport) // allows 10 requests every second //36000 per Hour
     euBlizzClient, err := blizzard.NewClient(blizzard.Config{
     ClientID:     goDotEnvVariable("CLIENT_ID"),
     ClientSecret: goDotEnvVariable("CLIENT_SECRET"),
@@ -63,14 +63,13 @@ func blizzClientExample() {
         log.Println(header)
         log.Println(err)
     }
-    //log.Println("Response Header:", header)
     for _, member := range roster.Members {
         memberInfo, header, err := euBlizzClient.WoWCharacterProfileSummary(ctx, member.Character.Realm.Slug, member.Character.Name)
         if err != nil {
             log.Println("Response Header:", header)
             log.Println(err)
         }
-        log.Printf("Member: %s, Level: %d, Points: %d\n", memberInfo.Name, memberInfo.Level, memberInfo.AchievementPoints)
+        log.Printf("Member: %s, Server: %s, Level: %d, Points: %d\n", memberInfo.Name, memberInfo.Realm.Slug, memberInfo.Level, memberInfo.AchievementPoints)
     }
 }
 
