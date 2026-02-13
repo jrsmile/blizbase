@@ -4,31 +4,42 @@ import (
     "log"
     "os"
     "net/http"
+	"time"
 
+	"golang.org/x/time/rate"
     "github.com/pocketbase/pocketbase"
     "github.com/pocketbase/pocketbase/apis"
     "github.com/pocketbase/pocketbase/core"
-
-	"github.com/vmihailenco/taskq/v3"
-	"github.com/vmihailenco/taskq/v3/memqueue"
-
     "github.com/FuzzyStatic/blizzard/v3"
 
 )
 
-func taskqExample() {
-    // Create a new in-memory queue.
-    queue := memqueue.NewQueue(&taskq.QueueOptions{
-        Name: "my_queue",
-    })
-    _ = queue
+type ThrottledTransport struct {
+	roundTripperWrap http.RoundTripper
+	ratelimiter      *rate.Limiter
 }
 
+func (c *ThrottledTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	err := c.ratelimiter.Wait(r.Context()) // This is a blocking call. Honors the rate limit
+	if err != nil {
+		return nil, err
+	}
+	return c.roundTripperWrap.RoundTrip(r)
+}
+
+func NewThrottledTransport(limitPeriod time.Duration, requestCount int, transportWrap http.RoundTripper) http.RoundTripper {
+	return &ThrottledTransport{
+		roundTripperWrap: transportWrap,
+		ratelimiter:      rate.NewLimiter(rate.Every(limitPeriod), requestCount),
+	}
+}
 func blizzClientExample() {
+    client := http.DefaultClient
+    client.Transport = NewThrottledTransport(10*time.Second, 60, http.DefaultTransport) // allows 60 requests every 10 seconds
     euBlizzClient, err := blizzard.NewClient(blizzard.Config{
     ClientID:     "my_client_id",
     ClientSecret: "my_client_secret",
-    HTTPClient:   http.DefaultClient,
+    HTTPClient:   client,
     Region:       blizzard.EU,
     Locale:       blizzard.DeDE,
     })
@@ -39,7 +50,6 @@ func blizzClientExample() {
 }
 
 func main() {
-    taskqExample()
     blizzClientExample()
     app := pocketbase.New()
 
