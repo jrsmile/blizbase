@@ -9,10 +9,22 @@ import (
     "github.com/pocketbase/pocketbase/apis"
     "github.com/pocketbase/pocketbase/core"
 
+	"github.com/vmihailenco/taskq/v3"
+	"github.com/vmihailenco/taskq/v3/memqueue"
+
     "github.com/FuzzyStatic/blizzard/v3"
+
 )
 
-func main() {
+func taskqExample() {
+    // Create a new in-memory queue.
+    queue := memqueue.NewQueue(&taskq.QueueOptions{
+        Name: "my_queue",
+    })
+    _ = queue
+}
+
+func blizzClientExample() {
     euBlizzClient, err := blizzard.NewClient(blizzard.Config{
     ClientID:     "my_client_id",
     ClientSecret: "my_client_secret",
@@ -24,6 +36,11 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
+}
+
+func main() {
+    taskqExample()
+    blizzClientExample()
     app := pocketbase.New()
 
     app.OnServe().BindFunc(func(se *core.ServeEvent) error {

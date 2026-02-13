@@ -11,6 +11,7 @@
 *.sln.docstates
 *.env
 pb_data/
+blizbase
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
