@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blitzbase – Guild Roster</title>
+
+  <!-- PocketBase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/gh/pocketbase/js-sdk@master/dist/pocketbase.umd.js"></script>
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+
+  <style>
+    /* ── Catppuccin Mocha Palette ── */
+    :root {
+      --ctp-rosewater: #f5e0dc;
+      --ctp-flamingo:  #f2cdcd;
+      --ctp-pink:      #f5c2e7;
+      --ctp-mauve:     #cba6f7;
+      --ctp-red:       #f38ba8;
+      --ctp-maroon:    #eba0ac;
+      --ctp-peach:     #fab387;
+      --ctp-yellow:    #f9e2af;
+      --ctp-green:     #a6e3a1;
+      --ctp-teal:      #94e2d5;
+      --ctp-sky:       #89dceb;
+      --ctp-sapphire:  #74c7ec;
+      --ctp-blue:      #89b4fa;
+      --ctp-lavender:  #b4befe;
+      --ctp-text:      #cdd6f4;
+      --ctp-subtext1:  #bac2de;
+      --ctp-subtext0:  #a6adc8;
+      --ctp-overlay2:  #9399b2;
+      --ctp-overlay1:  #7f849c;
+      --ctp-overlay0:  #6c7086;
+      --ctp-surface2:  #585b70;
+      --ctp-surface1:  #45475a;
+      --ctp-surface0:  #313244;
+      --ctp-base:      #1e1e2e;
+      --ctp-mantle:    #181825;
+      --ctp-crust:     #11111b;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--ctp-base);
+      color: var(--ctp-text);
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    header h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--ctp-lavender);
+      letter-spacing: -0.02em;
+    }
+    header p {
+      color: var(--ctp-subtext0);
+      margin-top: .35rem;
+      font-size: .95rem;
+    }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .3rem .75rem;
+      border-radius: 999px;
+      font-size: .8rem;
+      font-weight: 600;
+      background: var(--ctp-surface0);
+      color: var(--ctp-subtext1);
+    }
+    .status-pill.connected { background: rgba(166,227,161,.12); color: var(--ctp-green); }
+    .status-pill.disconnected { background: rgba(243,139,168,.12); color: var(--ctp-red); }
+    .status-pill .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .search-box {
+      flex: 1;
+      min-width: 200px;
+      padding: .6rem 1rem;
+      border: 1px solid var(--ctp-surface1);
+      border-radius: .5rem;
+      background: var(--ctp-mantle);
+      color: var(--ctp-text);
+      font-size: .9rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .search-box:focus { border-color: var(--ctp-lavender); }
+    .search-box::placeholder { color: var(--ctp-overlay0); }
+
+    select.filter-select {
+      padding: .6rem 1rem;
+      border: 1px solid var(--ctp-surface1);
+      border-radius: .5rem;
+      background: var(--ctp-mantle);
+      color: var(--ctp-text);
+      font-size: .9rem;
+      outline: none;
+      cursor: pointer;
+      transition: border-color .2s;
+      -webkit-appearance: none;
+      appearance: none;
+      min-width: 140px;
+    }
+    select.filter-select:focus { border-color: var(--ctp-lavender); }
+
+    /* ── Table ── */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: .75rem;
+      border: 1px solid var(--ctp-surface0);
+      background: var(--ctp-mantle);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .875rem;
+    }
+    thead th {
+      position: sticky;
+      top: 0;
+      background: var(--ctp-crust);
+      color: var(--ctp-subtext1);
+      text-align: left;
+      padding: .75rem 1rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: .75rem;
+      letter-spacing: .04em;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      transition: color .15s;
+    }
+    thead th:hover { color: var(--ctp-lavender); }
+    thead th .sort-icon { margin-left: .3rem; font-size: .7rem; }
+
+    tbody tr {
+      border-bottom: 1px solid var(--ctp-surface0);
+      transition: background .15s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(69,71,90,.35); }
+    tbody td {
+      padding: .65rem 1rem;
+      white-space: nowrap;
+      color: var(--ctp-subtext1);
+    }
+
+    /* highlight updated rows */
+    tbody tr.flash {
+      animation: rowFlash .8s ease-out;
+    }
+    @keyframes rowFlash {
+      0%   { background: rgba(137,180,250,.2); }
+      100% { background: transparent; }
+    }
+
+    /* ── Faction / Class colors ── */
+    .faction-horde    { color: var(--ctp-red); font-weight: 600; }
+    .faction-alliance { color: var(--ctp-blue); font-weight: 600; }
+
+    .class-warrior       { color: #C69B6D; }
+    .class-paladin       { color: #F48CBA; }
+    .class-hunter        { color: #AAD372; }
+    .class-rogue         { color: #FFF468; }
+    .class-priest        { color: #FFFFFF; }
+    .class-death-knight  { color: #C41E3A; }
+    .class-shaman        { color: #0070DD; }
+    .class-mage          { color: #3FC7EB; }
+    .class-warlock       { color: #8788EE; }
+    .class-monk          { color: #00FF98; }
+    .class-druid         { color: #FF7C0A; }
+    .class-demon-hunter  { color: #A330C9; }
+    .class-evoker        { color: #33937F; }
+
+    .level-max { color: var(--ctp-yellow); font-weight: 600; }
+    .ilvl-high { color: var(--ctp-peach); font-weight: 600; }
+
+    /* ── Misc ── */
+    .count-badge {
+      background: var(--ctp-surface0);
+      color: var(--ctp-subtext0);
+      padding: .2rem .6rem;
+      border-radius: .4rem;
+      font-size: .8rem;
+      font-weight: 600;
+    }
+
+    .loading-spinner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 4rem;
+      color: var(--ctp-overlay1);
+      font-size: .9rem;
+      gap: .5rem;
+    }
+    .loading-spinner::before {
+      content: '';
+      width: 20px; height: 20px;
+      border: 2px solid var(--ctp-surface1);
+      border-top-color: var(--ctp-lavender);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--ctp-overlay1);
+    }
+
+    /* ── Toast ── */
+    .toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: .5rem;
+    }
+    .toast {
+      background: var(--ctp-surface0);
+      color: var(--ctp-text);
+      padding: .6rem 1rem;
+      border-radius: .5rem;
+      font-size: .8rem;
+      border-left: 3px solid var(--ctp-lavender);
+      box-shadow: 0 4px 12px rgba(0,0,0,.3);
+      animation: toastIn .3s ease-out;
+    }
+    .toast.delete { border-left-color: var(--ctp-red); }
+    .toast.create { border-left-color: var(--ctp-green); }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      header h1 { font-size: 1.5rem; }
+      .controls { flex-direction: column; }
+      .search-box, select.filter-select { min-width: 100%; }
+    }
+  </style>
+</head>
+
+<body x-data="rosterApp()" x-init="init()">
+
+  <div class="container">
+    <header>
+      <h1>⚔ Double-Gamers EU Guild Roster</h1>
+      <p>World of Warcraft character tracker &mdash; Blizbase</p>
+    </header>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div>
+        <span class="status-pill" :class="connected ? 'connected' : 'disconnected'">
+          <span class="dot"></span>
+          <span x-text="connected ? 'Realtime Connected' : 'Disconnected'"></span>
+        </span>
+        <span class="count-badge" style="margin-left:.5rem">
+          <span x-text="filteredCharacters.length"></span> / <span x-text="characters.length"></span> characters
+        </span>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <template x-if="lastUpdate">
+          <span style="font-size:.75rem;color:var(--ctp-overlay1)">
+            Last update: <span x-text="lastUpdate"></span>
+          </span>
+        </template>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <input class="search-box" type="text" placeholder="Search by name, realm, class…"
+             x-model.debounce.200ms="search" />
+
+      <select class="filter-select" x-model="filterFaction">
+        <option value="">All Factions</option>
+        <template x-for="f in factions" :key="f">
+          <option :value="f" x-text="f"></option>
+        </template>
+      </select>
+
+      <select class="filter-select" x-model="filterClass">
+        <option value="">All Classes</option>
+        <template x-for="c in classes" :key="c">
+          <option :value="c" x-text="c"></option>
+        </template>
+      </select>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <template x-if="loading">
+        <div class="loading-spinner">Loading roster…</div>
+      </template>
+
+      <template x-if="!loading && filteredCharacters.length === 0">
+        <div class="empty-state">No characters found.</div>
+      </template>
+
+      <table x-show="!loading && filteredCharacters.length > 0" x-cloak>
+        <thead>
+          <tr>
+            <th @click="sortBy('name')">
+              Name <span class="sort-icon" x-text="sortIcon('name')"></span>
+            </th>
+            <th @click="sortBy('realm_name')">
+              Realm <span class="sort-icon" x-text="sortIcon('realm_name')"></span>
+            </th>
+            <th @click="sortBy('faction_name')">
+              Faction <span class="sort-icon" x-text="sortIcon('faction_name')"></span>
+            </th>
+            <th @click="sortBy('race_name')">
+              Race <span class="sort-icon" x-text="sortIcon('race_name')"></span>
+            </th>
+            <th @click="sortBy('character_class_name')">
+              Class <span class="sort-icon" x-text="sortIcon('character_class_name')"></span>
+            </th>
+            <th @click="sortBy('active_spec_name')">
+              Spec <span class="sort-icon" x-text="sortIcon('active_spec_name')"></span>
+            </th>
+            <th @click="sortBy('level')">
+              Level <span class="sort-icon" x-text="sortIcon('level')"></span>
+            </th>
+            <th @click="sortBy('equipped_item_level')">
+              iLvl <span class="sort-icon" x-text="sortIcon('equipped_item_level')"></span>
+            </th>
+            <th @click="sortBy('guild_name')">
+              Guild <span class="sort-icon" x-text="sortIcon('guild_name')"></span>
+            </th>
+            <th @click="sortBy('achievement_points')">
+              Ach. Pts <span class="sort-icon" x-text="sortIcon('achievement_points')"></span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="char in filteredCharacters" :key="char.id">
+            <tr :id="'row-' + char.id" :class="flashIds.has(char.id) ? 'flash' : ''">
+              <td style="color:var(--ctp-text);font-weight:600" x-text="char.name"></td>
+              <td x-text="char.realm_name"></td>
+              <td>
+                <span :class="factionClass(char.faction_type)" x-text="char.faction_name"></span>
+              </td>
+              <td x-text="char.race_name"></td>
+              <td>
+                <span :class="classColor(char.character_class_name)" x-text="char.character_class_name"></span>
+              </td>
+              <td x-text="char.active_spec_name"></td>
+              <td :class="char.level >= 80 ? 'level-max' : ''" x-text="char.level"></td>
+              <td :class="char.equipped_item_level >= 600 ? 'ilvl-high' : ''" x-text="char.equipped_item_level"></td>
+              <td x-text="char.guild_name"></td>
+              <td x-text="char.achievement_points"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div class="toast-container">
+    <template x-for="(toast, i) in toasts" :key="toast.id">
+      <div class="toast" :class="toast.type" x-text="toast.message"
+           x-transition x-show="true"></div>
+    </template>
+  </div>
+
+  <script>
+    function rosterApp() {
+      return {
+        pb: null,
+        characters: [],
+        loading: true,
+        connected: false,
+        search: '',
+        filterFaction: '',
+        filterClass: '',
+        sortField: 'name',
+        sortAsc: true,
+        lastUpdate: null,
+        flashIds: new Set(),
+        toasts: [],
+        toastCounter: 0,
+
+        async init() {
+          this.pb = new PocketBase(window.location.origin);
+
+          // Fetch all characters
+          try {
+            const records = await this.pb.collection('characters').getFullList({ sort: 'name' });
+            this.characters = records;
+          } catch (e) {
+            console.error('Failed to load characters:', e);
+          }
+          this.loading = false;
+
+          // Subscribe to realtime changes
+          this.subscribeRealtime();
+        },
+
+        async subscribeRealtime() {
+          try {
+            await this.pb.collection('characters').subscribe('*', (e) => {
+              this.connected = true;
+              const now = new Date();
+              this.lastUpdate = now.toLocaleTimeString();
+
+              if (e.action === 'create') {
+                // Add new character
+                const exists = this.characters.find(c => c.id === e.record.id);
+                if (!exists) {
+                  this.characters.push(e.record);
+                  this.flashRow(e.record.id);
+                  this.showToast(`${e.record.name} joined the roster`, 'create');
+                }
+              } else if (e.action === 'update') {
+                // Update existing character
+                const idx = this.characters.findIndex(c => c.id === e.record.id);
+                if (idx !== -1) {
+                  this.characters[idx] = e.record;
+                } else {
+                  this.characters.push(e.record);
+                }
+                this.flashRow(e.record.id);
+                this.showToast(`${e.record.name} updated`, 'update');
+              } else if (e.action === 'delete') {
+                // Remove character
+                const name = this.characters.find(c => c.id === e.record.id)?.name || 'Unknown';
+                this.characters = this.characters.filter(c => c.id !== e.record.id);
+                this.showToast(`${name} removed from roster`, 'delete');
+              }
+            });
+            this.connected = true;
+          } catch (e) {
+            console.error('Realtime subscription failed:', e);
+            this.connected = false;
+            // Retry after 5s
+            setTimeout(() => this.subscribeRealtime(), 5000);
+          }
+        },
+
+        flashRow(id) {
+          this.flashIds.add(id);
+          setTimeout(() => {
+            this.flashIds.delete(id);
+            // Force re-render
+            this.flashIds = new Set(this.flashIds);
+          }, 900);
+          // Also force reactivity
+          this.flashIds = new Set(this.flashIds);
+        },
+
+        showToast(message, type = 'update') {
+          const id = ++this.toastCounter;
+          this.toasts.push({ id, message, type });
+          setTimeout(() => {
+            this.toasts = this.toasts.filter(t => t.id !== id);
+          }, 4000);
+        },
+
+        // ── Computed-like ──
+        get filteredCharacters() {
+          let result = [...this.characters];
+          const q = this.search.toLowerCase();
+
+          if (q) {
+            result = result.filter(c =>
+              (c.name || '').toLowerCase().includes(q) ||
+              (c.realm_name || '').toLowerCase().includes(q) ||
+              (c.guild_name || '').toLowerCase().includes(q) ||
+              (c.character_class_name || '').toLowerCase().includes(q) ||
+              (c.race_name || '').toLowerCase().includes(q) ||
+              (c.active_spec_name || '').toLowerCase().includes(q)
+            );
+          }
+          if (this.filterFaction) {
+            result = result.filter(c => c.faction_name === this.filterFaction);
+          }
+          if (this.filterClass) {
+            result = result.filter(c => c.character_class_name === this.filterClass);
+          }
+
+          // Sort
+          const field = this.sortField;
+          const asc = this.sortAsc ? 1 : -1;
+          result.sort((a, b) => {
+            let va = a[field] ?? '';
+            let vb = b[field] ?? '';
+            if (typeof va === 'number' && typeof vb === 'number') {
+              return (va - vb) * asc;
+            }
+            return String(va).localeCompare(String(vb)) * asc;
+          });
+
+          return result;
+        },
+
+        get factions() {
+          return [...new Set(this.characters.map(c => c.faction_name).filter(Boolean))].sort();
+        },
+
+        get classes() {
+          return [...new Set(this.characters.map(c => c.character_class_name).filter(Boolean))].sort();
+        },
+
+        // ── Sorting ──
+        sortBy(field) {
+          if (this.sortField === field) {
+            this.sortAsc = !this.sortAsc;
+          } else {
+            this.sortField = field;
+            this.sortAsc = true;
+          }
+        },
+
+        sortIcon(field) {
+          if (this.sortField !== field) return '';
+          return this.sortAsc ? '▲' : '▼';
+        },
+
+        // ── Styling helpers ──
+        factionClass(type) {
+          if (!type) return '';
+          return type.toUpperCase() === 'HORDE' ? 'faction-horde' : 'faction-alliance';
+        },
+
+        classColor(className) {
+          if (!className) return '';
+          const slug = className.toLowerCase().replace(/\s+/g, '-');
+          return 'class-' + slug;
+        }
+      };
+    }
+  </script>
+
+</body>
+</html>
