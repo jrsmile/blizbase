@@ -186,10 +186,20 @@ func blizzClient(app *pocketbase.PocketBase) {
 	rosterKeys := make(map[string]struct{}, len(roster.Members))
 
 	for _, member := range roster.Members {
+		maxRetries := 3
 		memberInfo, header, err := euBlizzClient.WoWCharacterProfileSummary(ctx, member.Character.Realm.Slug, member.Character.Name)
+		for attempt := 1; attempt < maxRetries && header == nil; attempt++ {
+			log.Printf("Attempt %d/%d: nil header for %s-%s, retrying...", attempt+1, maxRetries, member.Character.Name, member.Character.Realm.Slug)
+			time.Sleep(time.Duration(attempt) * time.Second)
+			memberInfo, header, err = euBlizzClient.WoWCharacterProfileSummary(ctx, member.Character.Realm.Slug, member.Character.Name)
+		}
 		if err != nil {
 			log.Println("Response Header:", header)
 			log.Println(err)
+			continue
+		}
+		if header == nil {
+			log.Printf("Skipping %s-%s: nil header after %d retries", member.Character.Name, member.Character.Realm.Slug, maxRetries)
 			continue
 		}
 		idValue := strconv.Itoa(memberInfo.ID)
@@ -273,15 +283,15 @@ func main() {
 	})
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-       total, err := app.CountRecords("characters")
+		total, err := app.CountRecords("characters")
 		if total == 0 {
 			log.Printf("No records found, starting initial update...")
 			go blizzClient(app)
 		} else if err != nil {
 			log.Printf("Error counting records: %v", err)
 		}
-        return e.Next()
-    })
+		return e.Next()
+	})
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
