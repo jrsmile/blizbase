@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -137,6 +138,23 @@ func NewThrottledTransport(limitPeriod time.Duration, requestCount int, transpor
 	}
 }
 
+func normalizeValue(v any) string {
+	switch n := v.(type) {
+	case float64:
+		if n == float64(int64(n)) {
+			return strconv.FormatInt(int64(n), 10)
+		}
+		return strconv.FormatFloat(n, 'f', -1, 64)
+	case float32:
+		if n == float32(int32(n)) {
+			return strconv.FormatInt(int64(n), 10)
+		}
+		return strconv.FormatFloat(float64(n), 'f', -1, 32)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
 func setRecordFields(record *core.Record, collection *core.Collection, fields map[string]any) {
 	for name, value := range fields {
 		if collection.Fields.GetByName(name) != nil {
@@ -190,7 +208,7 @@ func blizzClient(app *pocketbase.PocketBase) {
 		memberInfo, header, err := euBlizzClient.WoWCharacterProfileSummary(ctx, member.Character.Realm.Slug, member.Character.Name)
 		for attempt := 1; attempt < maxRetries && header == nil; attempt++ {
 			log.Printf("Attempt %d/%d: nil header for %s-%s, retrying...", attempt+1, maxRetries, member.Character.Name, member.Character.Realm.Slug)
-			time.Sleep(time.Duration(attempt) * time.Second)
+			time.Sleep(time.Duration(attempt) * time.Second / 10)
 			memberInfo, header, err = euBlizzClient.WoWCharacterProfileSummary(ctx, member.Character.Realm.Slug, member.Character.Name)
 		}
 		if err != nil {
@@ -235,6 +253,19 @@ func blizzClient(app *pocketbase.PocketBase) {
 			"active_title_display_string": memberInfo.ActiveTitle.DisplayString,
 		}
 		if record, ok := existingRecords[idValue]; ok {
+			// check if any field value has changed, if not skip update
+			same := true
+			for key, value := range fieldValues {
+				if normalizeValue(record.Get(key)) != normalizeValue(value) {
+					same = false
+					log.Printf("Field '%s' changed for %s-%s: '%v' -> '%v'", key, record.GetString("name"), record.GetString("realm_name"), normalizeValue(record.Get(key)), normalizeValue(value))
+					break
+				}
+			}
+			if same {
+				//log.Printf("Skipping update for %s-%s, no changes detected.", record.GetString("name"), record.GetString("realm_name"))
+				continue
+			}
 			setRecordFields(record, collection, fieldValues)
 			err = app.Save(record)
 			if err != nil {
