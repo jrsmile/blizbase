@@ -14,6 +14,7 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/migrations"
+	"github.com/pocketbase/pocketbase/tools/types"
 	"golang.org/x/time/rate"
 )
 
@@ -55,9 +56,11 @@ func init() {
 		settings.RateLimits.Enabled = true
 		app.Save(settings)
 
-        collection, err := app.FindCollectionByNameOrId("characters")
+		collection, err := app.FindCollectionByNameOrId("characters")
 		if err != nil {
 			collection = core.NewBaseCollection("characters")
+			collection.ViewRule = types.Pointer("")
+			collection.ListRule = types.Pointer("")
 		}
 
 		if idField, ok := collection.Fields.GetByName("id").(*core.TextField); ok {
@@ -72,7 +75,7 @@ func init() {
 				collection.Fields.Add(field)
 			}
 		}
-        addField(&core.TextField{Name: "name"})
+		addField(&core.TextField{Name: "name"})
 		addField(&core.TextField{Name: "realm"})
 		addField(&core.TextField{Name: "gender_type"})
 		addField(&core.TextField{Name: "gender_name"})
@@ -262,13 +265,23 @@ func main() {
 	app.Cron().MustAdd("Update", "*/15 * * * *", func() {
 		blizzClient(app)
 	})
-
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		// serves static files from the provided public dir (if exists)
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))
 
 		return se.Next()
 	})
+
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+       total, err := app.CountRecords("characters")
+		if total == 0 {
+			log.Printf("No records found, starting initial update...")
+			go blizzClient(app)
+		} else if err != nil {
+			log.Printf("Error counting records: %v", err)
+		}
+        return e.Next()
+    })
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
