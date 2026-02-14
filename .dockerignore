@@ -1,0 +1,8 @@
+.env
+.git
+.gitignore
+pb_data
+*.md
+LICENSE
+Dockerfile
+.dockerignore
