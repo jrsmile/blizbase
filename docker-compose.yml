@@ -1,0 +1,13 @@
+services:
+  blizbase:
+    image: jrsmile/blizbase:latest
+    ports:
+      - "8090:8090"
+    volumes:
+      - pb_data:/app/pb_data
+    env_file:
+      - .env
+    restart: unless-stopped
+
+volumes:
+  pb_data:
