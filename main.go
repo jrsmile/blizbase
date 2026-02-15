@@ -306,6 +306,11 @@ func main() {
 	app.Cron().MustAdd("Update", "*/15 * * * *", func() {
 		blizzClient(app)
 	})
+
+	// checks for new container image every 5 minutes (watchtower-like)
+	app.Cron().MustAdd("SelfUpdate", "*/5 * * * *", func() {
+		watchForUpdates()
+	})
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		// serves static files from the provided public dir (if exists)
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))

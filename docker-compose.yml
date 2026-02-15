@@ -1,10 +1,11 @@
 services:
   blizbase:
-    image: jrsmile/blizbase:latest
+    image: ghcr.io/jrsmile/blizbase:latest
     ports:
       - "8090:8090"
     volumes:
       - pb_data:/app/pb_data
+      - /var/run/docker.sock:/var/run/docker.sock
     env_file:
       - .env
     restart: unless-stopped
