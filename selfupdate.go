@@ -286,5 +286,4 @@ func watchForUpdates() {
 		log.Printf("[selfupdate] Error restarting container: %v", err)
 		return
 	}
-	log.Println("[selfupdate] Container restarted with new image.")
 }

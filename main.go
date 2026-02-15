@@ -308,7 +308,7 @@ func main() {
 	})
 
 	// checks for new container image every 5 minutes (watchtower-like)
-	app.Cron().MustAdd("SelfUpdate", "*/5 * * * *", func() {
+	app.Cron().MustAdd("SelfUpdate", "*/20 * * * *", func() {
 		watchForUpdates()
 	})
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
