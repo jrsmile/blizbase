@@ -20,10 +20,7 @@ import (
 )
 
 func goDotEnvVariable(key string) string {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Printf("Error loading .env file, falling back to environment variables: %v", err)
-	}
+	_ = godotenv.Load(".env")
 	return os.Getenv(key)
 }
 
