@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -278,12 +279,14 @@ func watchForUpdates() {
 	}
 	if containerID == "" {
 		log.Println("[selfupdate] No running container found for this image. Pull complete; manual restart needed.")
+		os.Exit(1)
 		return
 	}
 
 	log.Printf("[selfupdate] Restarting container %s...", containerID[:12])
 	if err := restartContainer(ctx, containerID); err != nil {
 		log.Printf("[selfupdate] Error restarting container: %v", err)
+		os.Exit(1)
 		return
 	}
 }

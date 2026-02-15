@@ -302,12 +302,12 @@ func blizzClient(app *pocketbase.PocketBase) {
 
 func main() {
 	app := pocketbase.New()
-	// runs the "Update" task every 15 minutes
-	app.Cron().MustAdd("Update", "*/15 * * * *", func() {
+	// runs the "Update" task every 7 minutes
+	app.Cron().MustAdd("Update", "*/7 * * * *", func() {
 		blizzClient(app)
 	})
 
-	// checks for new container image every 5 minutes (watchtower-like)
+	// checks for new container image every 20 minutes (watchtower-like)
 	app.Cron().MustAdd("SelfUpdate", "*/20 * * * *", func() {
 		watchForUpdates()
 	})
