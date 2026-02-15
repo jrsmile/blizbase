@@ -18,7 +18,8 @@ FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
 
 WORKDIR /app
-
+COPY --from=library/docker:latest /usr/local/bin/docker /usr/bin/docker
+COPY --from=docker/compose:alpine-1.29.2 /usr/local/bin/docker-compose /usr/bin/docker-compose
 COPY --from=builder /app/blizbase .
 COPY pb_public ./pb_public
 

@@ -8,7 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -279,14 +279,21 @@ func watchForUpdates() {
 	}
 	if containerID == "" {
 		log.Println("[selfupdate] No running container found for this image. Pull complete; manual restart needed.")
-		os.Exit(1)
+		// execute shell command
+		cmd := exec.Command("docker-compose", "up", "-d")
+		if err := cmd.Run(); err != nil {
+			log.Printf("[selfupdate] Error executing shell command: %v", err)
+		}
 		return
 	}
 
 	log.Printf("[selfupdate] Restarting container %s...", containerID[:12])
 	if err := restartContainer(ctx, containerID); err != nil {
 		log.Printf("[selfupdate] Error restarting container: %v", err)
-		os.Exit(1)
+		cmd := exec.Command("docker-compose", "up", "-d")
+		if err := cmd.Run(); err != nil {
+			log.Printf("[selfupdate] Error executing shell command: %v", err)
+		}
 		return
 	}
 }
