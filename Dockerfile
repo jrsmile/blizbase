@@ -1,4 +1,8 @@
 FROM golang:1.25-alpine AS builder
+LABEL org.opencontainers.image.authors="JRSmile" \
+      org.opencontainers.image.description="Blizbase - A WoW Guild Roster Aggregator" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/jrsmile/blizbase"
 
 WORKDIR /app
 
